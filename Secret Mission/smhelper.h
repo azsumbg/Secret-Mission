@@ -76,7 +76,7 @@ class SMHELPER_API PROTON :public BASIC
 		int lifes = 0;
 		dirs dir = dirs::stop;
 		
-		PROTON(types _type, float _x, float _y, float _width, float _height) :BASIC(_x, y, _width, _height)
+		PROTON(types _type, float _x, float _y, float _width, float _height) :BASIC(_x, _y, _width, _height)
 		{
 			type = _type;
 		}
