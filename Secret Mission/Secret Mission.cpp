@@ -132,7 +132,7 @@ template <typename PTR> bool ReleaseCOM(PTR** Object)
 void ErrLog(LPCWSTR txt)
 {
     std::wofstream err_file(L".\\res\\data\\err.log", std::ios::app);
-    err_file << txt << L" / " << std::chrono::system_clock::now;
+    err_file << txt << L" ! at: " << std::chrono::system_clock::now() << std::endl;
     err_file.close();
 }
 bool GarbageCollector()
@@ -762,30 +762,30 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
         {
             Draw->FillRectangle(D2D1::RectF(0, 0, scr_width, 50.0f), but_bck_brush);
             if (set_name)
-                Draw->DrawTextW(L"Име на играч", 13, nrmTextForm, D2D1::RectF(b1Rct.left + 30.0f, 0, b1Rct.right, 50.0f),
+                Draw->DrawTextW(L"Име на играч", 13, nrmTextForm, D2D1::RectF(b1Rct.left + 50.0f, 0, b1Rct.right, 50.0f),
                     but_inact_brush);
             else
             {
                 if(b1_hglt)
-                    Draw->DrawTextW(L"Име на играч", 13, nrmTextForm, D2D1::RectF(b1Rct.left + 30.0f, 0, b1Rct.right, 50.0f),
+                    Draw->DrawTextW(L"Име на играч", 13, nrmTextForm, D2D1::RectF(b1Rct.left + 50.0f, 0, b1Rct.right, 50.0f),
                         but_hglt_brush);
                 else
-                    Draw->DrawTextW(L"Име на играч", 13, nrmTextForm, D2D1::RectF(b1Rct.left + 30.0f, 0, b1Rct.right, 50.0f),
+                    Draw->DrawTextW(L"Име на играч", 13, nrmTextForm, D2D1::RectF(b1Rct.left + 50.0f, 0, b1Rct.right, 50.0f),
                         but_txt_brush);
             }
 
             if (b2_hglt)
-                Draw->DrawTextW(L"Звуци ON / OFF", 15, nrmTextForm, D2D1::RectF(b2Rct.left + 30.0f, 0, b2Rct.right, 50.0f),
+                Draw->DrawTextW(L"Звуци ON / OFF", 15, nrmTextForm, D2D1::RectF(b2Rct.left + 50.0f, 0, b2Rct.right, 50.0f),
                     but_hglt_brush);
             else
-                Draw->DrawTextW(L"Звуци ON / OFF", 15, nrmTextForm, D2D1::RectF(b2Rct.left + 30.0f, 0, b2Rct.right, 50.0f),
+                Draw->DrawTextW(L"Звуци ON / OFF", 15, nrmTextForm, D2D1::RectF(b2Rct.left + 50.0f, 0, b2Rct.right, 50.0f),
                     but_txt_brush);
 
             if (b3_hglt)
-                Draw->DrawTextW(L"Помощ за играта", 16, nrmTextForm, D2D1::RectF(b3Rct.left + 30.0f, 0, b3Rct.right, 50.0f),
+                Draw->DrawTextW(L"Помощ за играта", 16, nrmTextForm, D2D1::RectF(b3Rct.left + 50.0f, 0, b3Rct.right, 50.0f),
                     but_hglt_brush);
             else
-                Draw->DrawTextW(L"Помощ за играта", 16, nrmTextForm, D2D1::RectF(b3Rct.left + 30.0f, 0, b3Rct.right, 50.0f),
+                Draw->DrawTextW(L"Помощ за играта", 16, nrmTextForm, D2D1::RectF(b3Rct.left + 50.0f, 0, b3Rct.right, 50.0f),
                     but_txt_brush);
         }
         
