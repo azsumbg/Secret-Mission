@@ -123,6 +123,8 @@ std::vector<prot_ptr>vLasers;
 std::vector<prot_ptr>vBadLasers;
 
 prot_ptr BadShip = nullptr;
+prot_ptr Cloud1 = nullptr;
+prot_ptr Cloud2 = nullptr;
 
 ///////////////////////////////////////
 
@@ -298,6 +300,8 @@ void InitGame()
     ReleaseCOM(&Field);
     ReleaseCOM(&Ship);
     ReleaseCOM(&BadShip);
+    ReleaseCOM(&Cloud1);
+    ReleaseCOM(&Cloud2);
     vRocks.clear();
     vLasers.clear();
     vBadLasers.clear();
@@ -431,7 +435,7 @@ void InitD2D1()
     bmpCloud1 = Load(L".\\res\\img\\cloud1.png", Draw);
     if (!bmpCloud1)ErrExit(eD2D, L"Error loading bmpCloud1");
 
-    bmpCloud2 = Load(L".\\res\\img\\cloud1.png", Draw);
+    bmpCloud2 = Load(L".\\res\\img\\cloud2.png", Draw);
     if (!bmpCloud2)ErrExit(eD2D, L"Error loading bmpCloud2");
 
     bmpGreatBlock = Load(L".\\res\\img\\vblock.png", Draw);
@@ -911,7 +915,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
         }
         if (Ship && !vRocks.empty())
         {
-            if(Ship->GetType()!=types::explosion)
+            if (Ship->GetType() != types::explosion)
             {
                 for (int i = 0; i < vRocks.size(); i++)
                 {
@@ -1105,6 +1109,31 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
         }
 
+        // BUBBLES ****************************
+
+        if (!Cloud1 && rand() % 300 == 22)Cloud1 = ProtonFactory(types::cloud1, scr_width, (float)(rand() % 500 + 55));
+        if (!Cloud2 && rand() % 250 == 33)Cloud2 = ProtonFactory(types::cloud2, scr_width, (float)(rand() % 500 + 55));
+
+        if (Cloud1)
+        {
+            if (rand() % 450 == 33)Cloud1->Transform(types::cloud2);
+            if (Cloud1->Move((float)(level)) == DLRESULT::fail)
+            {
+                Cloud1->Release();
+                Cloud1 = nullptr;
+            }
+        }
+
+        if (Cloud2)
+        {
+            if (rand() % 280 == 33)Cloud2->Transform(types::cloud1);
+            if (Cloud2->Move((float)(level)) == DLRESULT::fail)
+            {
+                Cloud2->Release();
+                Cloud2 = nullptr;
+            }
+        }
+
 
         //DRAW THINGS ***********************************************************************
 
@@ -1259,6 +1288,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             for (int i = 0; i < vLasers.size(); ++i)
                 Draw->DrawBitmap(bmpLaser, D2D1::RectF(vLasers[i]->x, vLasers[i]->y,
                     vLasers[i]->ex, vLasers[i]->ey));
+        if (Cloud1)
+            Draw->DrawBitmap(bmpCloud1, D2D1::RectF(Cloud1->x, Cloud1->y, Cloud1->ex, Cloud1->ey));
+        if (Cloud2)
+            Draw->DrawBitmap(bmpCloud2, D2D1::RectF(Cloud2->x, Cloud2->y, Cloud2->ex, Cloud2->ey));
+
 
         //////////////////////////////////////////////
         Draw->EndDraw();
