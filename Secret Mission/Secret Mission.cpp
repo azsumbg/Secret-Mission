@@ -279,7 +279,7 @@ void InitGame()
     score = 0;
     minutes = 0;
     seconds = 180;
-    wcscat_s(current_player, L"A SPY");
+    wcscpy_s(current_player, L"A SPY");
     set_name = false;
 
     if (!vRocks.empty())
@@ -1109,6 +1109,33 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
         }
 
+        if (!vLasers.empty() && !vRocks.empty())
+        {
+            for (std::vector<prot_ptr>::iterator rock = vRocks.begin(); rock < vRocks.end(); rock++)
+            {
+                bool killed = false;
+
+                for (std::vector<prot_ptr>::iterator laser = vLasers.begin(); laser < vLasers.end(); laser++)
+                {
+                    if (!((*laser)->x >= (*rock)->ex || (*laser)->ex <= (*rock)->x
+                        || (*laser)->y >= (*rock)->ey || (*laser)->ey <= (*rock)->y))
+                    {
+                        (*laser)->Release();
+                        vLasers.erase(laser);
+                        if ((*rock)->GetType() == types::vblock)
+                        {
+                            (*rock)->Transform(types::big_block_u);
+                            score += 30;
+                        }
+                        killed = true;
+                        break;
+                    }
+                }
+                if (killed)break;
+            }
+        }
+
+
         // BUBBLES ****************************
 
         if (!Cloud1 && rand() % 300 == 22)Cloud1 = ProtonFactory(types::cloud1, scr_width, (float)(rand() % 500 + 55));
@@ -1196,6 +1223,52 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
         }
 
+        wchar_t status_text[200] = L"\0";
+        wchar_t add[5] = L"\0";
+        int stat_size = 0;
+
+        wcscpy_s(status_text, current_player);
+
+        wcscat_s(status_text, L", ниво: ");
+        swprintf(add, 5, L"%d", level);
+        wcscat_s(status_text, add);
+
+        wcscat_s(status_text, L", резултат: ");
+        swprintf(add, 5, L"%d", score);
+        wcscat_s(status_text, add);
+
+        for (int i = 0; i < 200; ++i)
+        {
+            if (status_text[i] != '\0')stat_size++;
+            else break;
+        }
+
+        if (nrmTextForm && field_txt_brush)
+            Draw->DrawText(status_text, stat_size, bigTextForm, D2D1::RectF(10.0f, 700.0f, cl_width, cl_height), field_txt_brush);
+
+        wcscpy_s(status_text, L"0");
+        swprintf(add, 3, L"%d", minutes);
+        wcscat_s(status_text, add);
+        wcscat_s(status_text, L" : ");
+        if (seconds < 10)wcscat_s(status_text, L"0");
+        swprintf(add, 3, L"%d", seconds - minutes * 60);
+        if (seconds - minutes * 60 < 10)wcscat_s(status_text, L"0");
+        wcscat_s(status_text, add);
+
+        stat_size = 0;
+        for (int i = 0; i < 200; ++i)
+        {
+            if (status_text[i] != '\0')stat_size++;
+            else break;
+        }
+
+        if (nrmTextForm && field_txt_brush)
+            Draw->DrawText(status_text, stat_size, bigTextForm, D2D1::RectF(450.0f, 60.0f, 650.0f, 360.0f), field_txt_brush);
+
+
+        /////////////////////////////////////////////////////////////////////////////////////
+        
+        
         if (Ship)
         {
             if (Ship->GetType() != types::explosion)
@@ -1270,7 +1343,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             {
                 int ex_frame = BadShip->GetFrame();
                 Draw->DrawBitmap(bmpExplosion[ex_frame], D2D1::RectF(BadShip->x, BadShip->y - 100.0f, 
-                    BadShip->ex+50.0f, BadShip->ey));
+                    BadShip->ex + 50.0f, BadShip->ey));
                 if (ex_frame >= 23)
                 {
                     BadShip->Release();
