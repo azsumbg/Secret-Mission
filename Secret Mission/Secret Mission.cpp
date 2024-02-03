@@ -119,9 +119,10 @@ ID2D1Bitmap* bmpShipR[13] = { 0 };
 prot_ptr Field = nullptr;
 prot_ptr Ship = nullptr;
 std::vector<prot_ptr>vRocks;
+std::vector<prot_ptr>vLasers;
+std::vector<prot_ptr>vBadLasers;
 
 prot_ptr BadShip = nullptr;
-
 
 ///////////////////////////////////////
 
@@ -284,10 +285,22 @@ void InitGame()
         for (int i = 0; i < vRocks.size(); ++i)ReleaseCOM(&vRocks[i]);
     }
 
+    if (!vLasers.empty())
+    {
+        for (int i = 0; i < vLasers.size(); ++i)ReleaseCOM(&vLasers[i]);
+    }
+
+    if (!vBadLasers.empty())
+    {
+        for (int i = 0; i < vBadLasers.size(); ++i)ReleaseCOM(&vBadLasers[i]);
+    }
+
     ReleaseCOM(&Field);
     ReleaseCOM(&Ship);
     ReleaseCOM(&BadShip);
     vRocks.clear();
+    vLasers.clear();
+    vBadLasers.clear();
 
     Field = ProtonFactory(types::field, 0, 0);
     Ship = ProtonFactory(types::ship, 120.0f, cl_height / 2);
@@ -321,17 +334,17 @@ void InitGame()
         {
             start_x = cl_width;
             if (one_type == types::big_block_u)start_y = 51.0f;
-            else if (one_type == types::big_block_d)start_y = cl_height - 120.0f;
+            else if (one_type == types::big_block_d)start_y = 550.0f;
             else if (one_type == types::small_block)start_y = 51.0f;
-            else if (one_type == types::vblock) start_y = 51.0f + rand() % 440;
+            else if (one_type == types::vblock) start_y = 51.0f + rand() % 200;
         }
         else
         {
             start_x = vRocks.back()->ex;
             if (one_type == types::big_block_u)start_y = 51.0f;
-            else if (one_type == types::big_block_d)start_y = cl_height - 120.0f;
+            else if (one_type == types::big_block_d)start_y = 550.0f;
             else if (one_type == types::small_block)start_y = 51.0f;
-            else if (one_type == types::vblock) start_y = 51.0f + rand() % 440;
+            else if (one_type == types::vblock) start_y = 51.0f + rand() % 200;
         }
         vRocks.push_back(ProtonFactory(one_type, start_x, start_y));
     }
@@ -769,7 +782,8 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
             break;
 
         case VK_CONTROL:
-           
+            if (Ship)
+                vLasers.push_back(ProtonFactory(types::laser, Ship->ex, Ship->y + 20.0f));
             break;
 
         }
@@ -847,7 +861,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
         //SHIP *******************
 
-        if (Ship)Ship->Move((float)(level));
+        if (Ship)
+        {
+            if (Ship->GetType() != types::explosion)Ship->Move((float)(level));
+        }
         if (!vRocks.empty())
         {
             for (std::vector<prot_ptr>::iterator rock = vRocks.begin(); rock < vRocks.end(); ++rock)
@@ -885,14 +902,35 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                 break;
             }
             if (one_type == types::big_block_u)start_y = 51.0f;
-            else if (one_type == types::big_block_d)start_y = cl_height - 120.0f;
+            else if (one_type == types::big_block_d)start_y = 550.0f;
             else if (one_type == types::small_block)start_y = 51.0f;
-            else if (one_type == types::vblock)start_y = 51.0f + rand() % 440;
+            else if (one_type == types::vblock)start_y = 51.0f + rand() % 200;
 
             vRocks.push_back(ProtonFactory(one_type, start_x, start_y));
             
         }
-
+        if (Ship && !vRocks.empty())
+        {
+            if(Ship->GetType()!=types::explosion)
+            {
+                for (int i = 0; i < vRocks.size(); i++)
+                {
+                    if (!(Ship->x > vRocks[i]->ex || Ship->ex < vRocks[i]->x || Ship->y > vRocks[i]->ey || Ship->ey < vRocks[i]->y))
+                    {
+                        Ship->Transform(types::explosion);
+                        break;
+                    }
+                }
+            }
+        }
+        if (Ship && BadShip)
+        {
+            if (Ship->GetType() != types::explosion && BadShip->GetType() != types::explosion)
+            {
+                if (!(Ship->x > BadShip->ex || Ship->ex < BadShip->x || Ship->y > BadShip->ey || Ship->ey < BadShip->y))
+                    Ship->Transform(types::explosion);
+            }
+        }
 
         /////////////////////////
 
@@ -901,52 +939,51 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
         //MOVE ****************
         if (!BadShip)
         {
-            if (rand() % 100 == 33)BadShip = ProtonFactory(types::battleship, cl_width, 55.0f + 
-                static_cast<float>(rand() % (int)(cl_height - 50)));
+            if (rand() % 100 == 33)BadShip = ProtonFactory(types::battleship, cl_width + 100.0f, 55.0f + 
+                static_cast<float>(rand() % 450));
         }
-        else
+        else if (BadShip->GetType() != types::explosion)
         {
             bas_ptr dummy = nullptr;
             float dummy_speed = 0.8f * level;
-            bool left_ok = false;
-            bool up_ok = false;
-            bool down_ok = false;
+            bool left_ok = true;
+            bool up_ok = true;
+            bool down_ok = true;
 
-            dummy = new BASIC(BadShip->x, BadShip->y, 100.0f, 51.0f);
-
-            dummy->x += dummy_speed;
-            dummy->SetEdges();
-
-            left_ok = true;
-
-            if (!vRocks.empty())
+            if (BadShip->dir == dirs::left)
             {
-                for (std::vector<prot_ptr>::iterator it = vRocks.begin(); it < vRocks.end(); it++)
-                {
-                    if (!(dummy->x >= (*it)->ex || dummy->ex <= (*it)->x
-                        || dummy->y >= (*it)->ey || dummy->ey <= (*it)->y))
-                    {
-                        left_ok = false;
-                        break;
-                    }
-                }
-            }
+                dummy = new BASIC(BadShip->x, BadShip->y, 100.0f, 51.0f);
 
-            if (!left_ok)
-            {
                 dummy->x -= dummy_speed;
                 dummy->SetEdges();
 
-                dummy->y += dummy_speed;
-                dummy->SetEdges();
-
-                down_ok = true;
-                
                 if (!vRocks.empty())
                 {
                     for (std::vector<prot_ptr>::iterator it = vRocks.begin(); it < vRocks.end(); it++)
                     {
                         if (!(dummy->x >= (*it)->ex || dummy->ex <= (*it)->x
+                            || dummy->y >= (*it)->ey || dummy->ey <= (*it)->y))
+                        {
+                            left_ok = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (BadShip->dir == dirs::down)
+            {
+                ReleaseCOM(&dummy);
+                dummy = new BASIC(BadShip->x, BadShip->y, 100.0f, 51.0f);
+
+                dummy->y += dummy_speed;
+                dummy->SetEdges();
+
+                if (!vRocks.empty())
+                {
+                    for (std::vector<prot_ptr>::iterator it = vRocks.begin(); it < vRocks.end(); it++)
+                    {
+                        if (!(dummy->x > (*it)->ex || dummy->ex < (*it)->x
                             || dummy->y >= (*it)->ey || dummy->ey <= (*it)->y))
                         {
                             down_ok = false;
@@ -955,22 +992,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                     }
                 }
             }
-
-            if (!left_ok && !down_ok)
+            
+            if (BadShip->dir == dirs::up)
             {
-                dummy->y -= dummy_speed;
-                dummy->SetEdges();
+                ReleaseCOM(&dummy);
+                dummy = new BASIC(BadShip->x, BadShip->y, 100.0f, 51.0f);
 
                 dummy->y -= dummy_speed;
                 dummy->SetEdges();
-
-                up_ok = true;
 
                 if (vRocks.empty())
                 {
                     for (std::vector<prot_ptr>::iterator it = vRocks.begin(); it < vRocks.end(); it++)
                     {
-                        if (!(dummy->x >= (*it)->ex || dummy->ex <= (*it)->x
+                        if (!(dummy->x > (*it)->ex || dummy->ex < (*it)->x
                             || dummy->y >= (*it)->ey || dummy->ey <= (*it)->y))
                         {
                             up_ok = false;
@@ -979,19 +1014,96 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                     }
                 }
             }
-            
-            if (left_ok || (!left_ok && !up_ok && !down_ok))BadShip->dir = dirs::left;
-            else if (down_ok)BadShip->dir = dirs::down;
-            else if (up_ok)BadShip->dir = dirs::up;
-                
-            if (BadShip->Move((float)(level)) == DLRESULT::fail)
+
+            if (left_ok) BadShip->dir = dirs::left;
+            else
             {
-                BadShip->Release();
-                BadShip = nullptr;
+                if (down_ok) BadShip->dir = dirs::down;
+                else if (up_ok)BadShip->dir = dirs::up;
+            }
+
+            if (!left_ok && !down_ok && !up_ok) BadShip->Transform(types::explosion);
+
+            if (BadShip->GetType() != types::explosion)
+            {
+                if (BadShip->Move((float)(level)) == DLRESULT::fail)
+                {
+                    BadShip->Release();
+                    BadShip = nullptr;
+                }
             }
             ReleaseCOM(&dummy);
         }
 
+        if (BadShip && rand() % 200 == 66)
+            vBadLasers.push_back(ProtonFactory(types::bad_laser, BadShip->x, BadShip->y + 25.0f));
+
+
+        // LASERS *****************************
+        if (!vBadLasers.empty())
+        {
+            for (std::vector<prot_ptr>::iterator las = vBadLasers.begin(); las < vBadLasers.end(); las++)
+            {
+                if ((*las)->Move((float)(level)) == DLRESULT::fail)
+                {
+                    (*las)->Release();
+                    vBadLasers.erase(las);
+                    break;
+                }
+            }
+        }
+        if (!vLasers.empty())
+        {
+            for (std::vector<prot_ptr>::iterator las = vLasers.begin(); las < vLasers.end(); las++)
+            {
+                if ((*las)->Move((float)(level)) == DLRESULT::fail)
+                {
+                    (*las)->Release();
+                    vLasers.erase(las);
+                    break;
+                }
+            }
+        }
+
+        if (!vBadLasers.empty())
+        {
+            for (std::vector<prot_ptr>::iterator las = vBadLasers.begin(); las < vBadLasers.end(); las++)
+            {
+                if (Ship)
+                {
+                    if (!(Ship->x >= (*las)->ex || Ship->ex <= (*las)->x || Ship->y >= (*las)->ey || Ship->ey <= (*las)->y))
+                    {
+                        Ship->lifes -= 30;
+                        if (Ship->lifes <= 0)Ship->Transform(types::explosion);
+                        (*las)->Release();
+                        vBadLasers.erase(las);
+                        break;
+                    }
+                }
+            }
+        }
+        if (!vLasers.empty())
+        {
+            for (std::vector<prot_ptr>::iterator las = vLasers.begin(); las < vLasers.end(); las++)
+            {
+                if (BadShip)
+                {
+                    if (!(BadShip->x >= (*las)->ex || BadShip->ex <= (*las)->x || 
+                        BadShip->y >= (*las)->ey || BadShip->ey <= (*las)->y))
+                    {
+                        BadShip->lifes -= 20;
+                        if (BadShip->lifes <= 0)
+                        {
+                            score += 50;
+                            BadShip->Transform(types::explosion);
+                        }
+                        (*las)->Release();
+                        vLasers.erase(las);
+                        break;
+                    }
+                }
+            }
+        }
 
 
         //DRAW THINGS ***********************************************************************
@@ -1029,72 +1141,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                 Draw->DrawTextW(L"Помощ за играта", 16, nrmTextForm, D2D1::RectF(b3Rct.left + 50.0f, 0, b3Rct.right, 50.0f),
                     but_txt_brush);
         }
-       
-        if (Ship)
-        {
-            ID2D1RadialGradientBrush* AuraBrush = nullptr;
-            D2D1_GRADIENT_STOP oneStop[2] = { 0 };
-            ID2D1GradientStopCollection* StopCollection = nullptr;
-
-            if (Ship->lifes > 80)
-            {
-                oneStop[0].position = 0;
-                oneStop[0].color = D2D1::ColorF(D2D1::ColorF::DarkGreen);
-                oneStop[1].position = 1.0f;
-                oneStop[1].color = D2D1::ColorF(D2D1::ColorF::GreenYellow);
-            }
-            else if (Ship->lifes <= 80 && Ship->lifes > 40)
-            {
-                oneStop[0].position = 0;
-                oneStop[0].color = D2D1::ColorF(D2D1::ColorF::Yellow);
-                oneStop[1].position = 1.0f;
-                oneStop[1].color = D2D1::ColorF(D2D1::ColorF::LightYellow);
-            }
-            else
-            {
-                oneStop[0].position = 0;
-                oneStop[0].color = D2D1::ColorF(D2D1::ColorF::DarkRed);
-                oneStop[1].position = 1.0f;
-                oneStop[1].color = D2D1::ColorF(D2D1::ColorF::OrangeRed);
-            }
-
-            if (Draw)
-            {
-                Draw->CreateGradientStopCollection(oneStop, 2, &StopCollection);
-                Draw->CreateRadialGradientBrush(D2D1::RadialGradientBrushProperties(D2D1::Point2F(Ship->x + 50.0f,
-                    Ship->y + 18.0f), D2D1::Point2F(0, 0), 70.0f, 38.0f), StopCollection, &AuraBrush);
-                if (AuraBrush)
-                    Draw->FillEllipse(D2D1::Ellipse(D2D1::Point2F(Ship->x + 50.0f, Ship->y + 18.0f), 70.0f, 38.0f), AuraBrush);
-            }
-            ReleaseCOM(&AuraBrush);
-            ReleaseCOM(&StopCollection);
-        }
-        if (Ship)
-        {
-            int ex_frame = Ship->GetFrame();
-
-            if (Ship->GetType() == types::explosion)
-            {
-                Draw->DrawBitmap(bmpExplosion[ex_frame], D2D1::RectF(Ship->x, Ship->y, Ship->ex, Ship->ey));
-                if (ex_frame >= 23)GameOver();
-            }
-            else
-            {
-                if (Ship->dir == dirs::right || Ship->dir == dirs::stop)
-                    Draw->DrawBitmap(bmpShipR[ex_frame], D2D1::RectF(Ship->x, Ship->y, Ship->ex, Ship->ey));
-                else if (Ship->dir == dirs::left)
-                    Draw->DrawBitmap(bmpShipL[ex_frame], D2D1::RectF(Ship->x, Ship->y, Ship->ex, Ship->ey));
-                else if (Ship->dir == dirs::up || Ship->dir == dirs::down)
-                {
-                    if (ship_prev_dir == dirs::right || ship_prev_dir == dirs::stop)
-                        Draw->DrawBitmap(bmpShipR[ex_frame], D2D1::RectF(Ship->x, Ship->y, Ship->ex, Ship->ey));
-                    else if (ship_prev_dir == dirs::left)
-                        Draw->DrawBitmap(bmpShipL[ex_frame], D2D1::RectF(Ship->x, Ship->y, Ship->ex, Ship->ey));
-                }
-            }
-            
-        }
-        
+        Draw->DrawLine(D2D1::Point2F(0, 685.0f), D2D1::Point2F(scr_width, 685.0f), field_txt_brush, 10.0f);
         if (!vRocks.empty())
         {
             for (int i = 0; i < vRocks.size(); ++i)
@@ -1120,13 +1167,101 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
         }
 
+        if (Ship)
+        {
+            if (Ship->GetType() != types::explosion)
+            {
+                ID2D1RadialGradientBrush* AuraBrush = nullptr;
+                D2D1_GRADIENT_STOP oneStop[2] = { 0 };
+                ID2D1GradientStopCollection* StopCollection = nullptr;
+
+                if (Ship->lifes > 80)
+                {
+                    oneStop[0].position = 0;
+                    oneStop[0].color = D2D1::ColorF(D2D1::ColorF::DarkGreen);
+                    oneStop[1].position = 1.0f;
+                    oneStop[1].color = D2D1::ColorF(D2D1::ColorF::GreenYellow);
+                }
+                else if (Ship->lifes <= 80 && Ship->lifes > 40)
+                {
+                    oneStop[0].position = 0;
+                    oneStop[0].color = D2D1::ColorF(D2D1::ColorF::Yellow);
+                    oneStop[1].position = 1.0f;
+                    oneStop[1].color = D2D1::ColorF(D2D1::ColorF::LightYellow);
+                }
+                else
+                {
+                    oneStop[0].position = 0;
+                    oneStop[0].color = D2D1::ColorF(D2D1::ColorF::DarkRed);
+                    oneStop[1].position = 1.0f;
+                    oneStop[1].color = D2D1::ColorF(D2D1::ColorF::OrangeRed);
+                }
+
+                if (Draw)
+                {
+                    Draw->CreateGradientStopCollection(oneStop, 2, &StopCollection);
+                    Draw->CreateRadialGradientBrush(D2D1::RadialGradientBrushProperties(D2D1::Point2F(Ship->x + 50.0f,
+                        Ship->y + 18.0f), D2D1::Point2F(0, 0), 70.0f, 38.0f), StopCollection, &AuraBrush);
+                    if (AuraBrush)
+                        Draw->FillEllipse(D2D1::Ellipse(D2D1::Point2F(Ship->x + 50.0f, Ship->y + 18.0f), 70.0f, 38.0f), AuraBrush);
+                }
+                ReleaseCOM(&AuraBrush);
+                ReleaseCOM(&StopCollection);
+            }
+        }
+        if (Ship)
+        {
+            int ex_frame = Ship->GetFrame();
+
+            if (Ship->GetType() == types::explosion)
+            {
+                Draw->DrawBitmap(bmpExplosion[ex_frame], D2D1::RectF(Ship->x, Ship->y - 100.0f, Ship->ex + 50.0f, Ship->ey));
+                if (ex_frame >= 23)GameOver();
+            }
+            else
+            {
+                if (Ship->dir == dirs::right || Ship->dir == dirs::stop)
+                    Draw->DrawBitmap(bmpShipR[ex_frame], D2D1::RectF(Ship->x, Ship->y, Ship->ex, Ship->ey));
+                else if (Ship->dir == dirs::left)
+                    Draw->DrawBitmap(bmpShipL[ex_frame], D2D1::RectF(Ship->x, Ship->y, Ship->ex, Ship->ey));
+                else if (Ship->dir == dirs::up || Ship->dir == dirs::down)
+                {
+                    if (ship_prev_dir == dirs::right || ship_prev_dir == dirs::stop)
+                        Draw->DrawBitmap(bmpShipR[ex_frame], D2D1::RectF(Ship->x, Ship->y, Ship->ex, Ship->ey));
+                    else if (ship_prev_dir == dirs::left)
+                        Draw->DrawBitmap(bmpShipL[ex_frame], D2D1::RectF(Ship->x, Ship->y, Ship->ex, Ship->ey));
+                }
+            }
+            
+        }
+        
         if (BadShip)
-            Draw->DrawBitmap(bmpBadShip, D2D1::RectF(BadShip->x, BadShip->y, BadShip->ex, BadShip->ey));
+        {
+            if (BadShip->GetType() == types::explosion)
+            {
+                int ex_frame = BadShip->GetFrame();
+                Draw->DrawBitmap(bmpExplosion[ex_frame], D2D1::RectF(BadShip->x, BadShip->y - 100.0f, 
+                    BadShip->ex+50.0f, BadShip->ey));
+                if (ex_frame >= 23)
+                {
+                    BadShip->Release();
+                    BadShip = nullptr;
+                }
+            }
+            else
+                Draw->DrawBitmap(bmpBadShip, D2D1::RectF(BadShip->x, BadShip->y, BadShip->ex, BadShip->ey));
+        }
+        if (!vBadLasers.empty())
+            for (int i = 0; i < vBadLasers.size(); ++i)
+                Draw->DrawBitmap(bmpBadLaser, D2D1::RectF(vBadLasers[i]->x, vBadLasers[i]->y,
+                    vBadLasers[i]->ex, vBadLasers[i]->ey));
+        if (!vLasers.empty())
+            for (int i = 0; i < vLasers.size(); ++i)
+                Draw->DrawBitmap(bmpLaser, D2D1::RectF(vLasers[i]->x, vLasers[i]->y,
+                    vLasers[i]->ex, vLasers[i]->ey));
 
-
+        //////////////////////////////////////////////
         Draw->EndDraw();
-
-
     }
 
     GarbageCollector();
