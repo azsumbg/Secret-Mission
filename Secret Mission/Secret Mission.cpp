@@ -108,6 +108,7 @@ ID2D1Bitmap* bmpGreatBlock = nullptr;
 ID2D1Bitmap* bmpCloud1 = nullptr;
 ID2D1Bitmap* bmpCloud2 = nullptr;
 ID2D1Bitmap* bmpPortal = nullptr;
+ID2D1Bitmap* bmpSpare = nullptr;
 
 ID2D1Bitmap* bmpExplosion[24] = { 0 };
 ID2D1Bitmap* bmpField[10] = { 0 };
@@ -126,6 +127,7 @@ prot_ptr BadShip = nullptr;
 prot_ptr Cloud1 = nullptr;
 prot_ptr Cloud2 = nullptr;
 bas_ptr Portal = nullptr;
+bas_ptr Spare = nullptr;
 
 ///////////////////////////////////////
 
@@ -304,6 +306,7 @@ void InitGame()
     ReleaseCOM(&Cloud1);
     ReleaseCOM(&Cloud2);
     ReleaseCOM(&Portal);
+    ReleaseCOM(&Spare);
     vRocks.clear();
     vLasers.clear();
     vBadLasers.clear();
@@ -356,12 +359,74 @@ void InitGame()
     }
 
 }
+BOOL CheckRecord()
+{
+    if (score < 1)return no_record;
 
+    int result = 0;
+    CheckFile(recordFile, &result);
+    if (result == FILE_NOT_EXIST)
+    {
+        std::wofstream rec(recordFile);
+        rec << score << std::endl;
+        for (int i = 0; i < 16; i++)rec << static_cast<int>(current_player[i]) << std::endl;
+        rec.close();
+        return first_record;
+    }
+
+    std::wifstream check(recordFile);
+    check >> result;
+    check.close();
+
+    if (result < score)
+    {
+        std::wofstream rec(recordFile);
+        rec << score << std::endl;
+        for (int i = 0; i < 16; i++)rec << static_cast<int>(current_player[i]) << std::endl;
+        rec.close();
+        return record;
+    }
+    return no_record;
+}
 void GameOver()
 {
     KillTimer(bHwnd, bTimer);
     PlaySound(NULL, NULL, NULL);
 
+    wchar_t final_text[20] = L"О, О, О ! ЗАГУБИ !";
+    wchar_t show_text[20] = L"\0";
+
+    switch (CheckRecord())
+    {
+    case no_record:
+        if (sound)PlaySound(L".\\res\\snd\\loose.wav", NULL, SND_ASYNC);
+        break;
+
+    case first_record:
+        if (sound)PlaySound(L".\\res\\snd\\record.wav", NULL, SND_ASYNC);
+        wcscpy_s(final_text, L"ПЪРВИ РЕКОРД НА ИГРАТА !");
+        break;
+
+    case record:
+        if (sound)PlaySound(L".\\res\\snd\\record.wav", NULL, SND_ASYNC);
+        wcscpy_s(final_text, L"СВЕТОВЕН РЕКОРД НА ИГРАТА !");
+        break;
+    }
+
+    for (int i = 0; i < 20; i++)
+    {
+        mciSendString(L"play .\\res\\snd\\click.wav", NULL, NULL, NULL);
+        show_text[i] = final_text[i];
+        if (Draw && bigTextForm && field_txt_brush)
+        {
+            Draw->BeginDraw();
+            Draw->Clear(D2D1::ColorF(D2D1::ColorF::DarkBlue));
+            Draw->DrawTextW(show_text, i, bigTextForm, D2D1::RectF(200.0f, 300.0f, cl_width, cl_height), field_txt_brush);
+            Draw->EndDraw();
+            Sleep(30);
+        }
+    }
+    Sleep(2500);
 
     bMsg.message = WM_QUIT;
     bMsg.wParam = 0;
@@ -448,6 +513,9 @@ void InitD2D1()
 
     bmpSmallBlock = Load(L".\\res\\img\\small_block.png", Draw);
     if (!bmpSmallBlock)ErrExit(eD2D, L"Error loading bmpSmallBlock");
+
+    bmpSpare = Load(L".\\res\\img\\spare.png", Draw);
+    if (!bmpSpare)ErrExit(eD2D, L"Error loading bmpSpare");
 
     bmpLaser = Load(L".\\res\\img\\laser.png", Draw);
     if (!bmpLaser)ErrExit(eD2D, L"Error loading bmpLaser");
@@ -569,6 +637,7 @@ void NewLevel()
     ReleaseCOM(&Cloud1);
     ReleaseCOM(&Cloud2);
     ReleaseCOM(&Portal);
+    ReleaseCOM(&Spare);
     vRocks.clear();
     vLasers.clear();
     vBadLasers.clear();
@@ -715,7 +784,10 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
         if (seconds <= 0)
         {
             if (!Portal)
+            {
+                if (sound)mciSendString(L"play .\\res\\snd\\warp.wav", NULL, NULL, NULL);
                 Portal = new BASIC(850.0f, 51.0f + rand() % 550, 100.0f, 100.0f);
+            }
             break;
         }
         seconds--;
@@ -884,16 +956,19 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
         switch (LOWORD(wParam))
         {
         case VK_LEFT:
+            if (sound)mciSendString(L"play .\\res\\snd\\engine.wav", NULL, NULL, NULL);
             if (Ship)Ship->dir = dirs::left;
             break;
 
         case VK_RIGHT:
+            if (sound)mciSendString(L"play .\\res\\snd\\engine.wav", NULL, NULL, NULL);
             if (Ship)Ship->dir = dirs::right;
             break;
 
         case VK_UP:
             if (Ship)
             {
+                if (sound)mciSendString(L"play .\\res\\snd\\engine.wav", NULL, NULL, NULL);
                 if (Ship->dir != dirs::up && Ship->dir != dirs::down)ship_prev_dir = Ship->dir;
                 Ship->dir = dirs::up;
             }
@@ -902,17 +977,52 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
         case VK_DOWN:
             if (Ship)
             {
+                if (sound)mciSendString(L"play .\\res\\snd\\engine.wav", NULL, NULL, NULL);
                 if (Ship->dir != dirs::up && Ship->dir != dirs::down)ship_prev_dir = Ship->dir; 
                 Ship->dir = dirs::down;
             }
             break;
 
         case VK_CONTROL:
+            if (sound)mciSendString(L"play .\\res\\snd\\laser.wav", NULL, NULL, NULL);
             if (Ship)
                 vLasers.push_back(ProtonFactory(types::laser, Ship->ex, Ship->y + 20.0f));
             break;
 
         }
+        break;
+
+    case WM_LBUTTONDOWN:
+        if (LOWORD(lParam) >= b1Rct.left && LOWORD(lParam) <= b1Rct.right && HIWORD(lParam) <= 50.0f)
+        {
+            if (set_name)
+            {
+                if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+                break;
+            }
+            if (sound)mciSendString(L"play .\\res\\snd\\select.wav", NULL, NULL, NULL);
+            if (DialogBox(bIns, MAKEINTRESOURCE(IDD_PLAYER), hwnd, &bDlgProc) == IDOK)set_name = true;
+            break;
+        }
+        if (LOWORD(lParam) >= b2Rct.left && LOWORD(lParam) <= b2Rct.right && HIWORD(lParam) <= 50.0f)
+        {
+            if (sound)
+            {
+                mciSendString(L"play .\\res\\snd\\select.wav", NULL, NULL, NULL);
+                sound = false;
+                PlaySound(NULL, NULL, NULL);
+                break;
+            }
+            else
+            {
+                sound = true;
+                PlaySound(soundFile, NULL, SND_ASYNC | SND_LOOP);
+                break;
+            }
+        }
+
+
+
         break;
 
     default: return DefWindowProc(hwnd, ReceivedMsg, wParam, lParam);
@@ -1054,7 +1164,25 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             if (Ship->GetType() != types::explosion && BadShip->GetType() != types::explosion)
             {
                 if (!(Ship->x > BadShip->ex || Ship->ex < BadShip->x || Ship->y > BadShip->ey || Ship->ey < BadShip->y))
+                {
+                    if (sound)mciSendString(L"play .\\res\\snd\\explosion.wav", NULL, NULL, NULL);
                     Ship->Transform(types::explosion);
+                }
+            }
+        }
+        if (Ship && Spare)
+        {
+            if (!(Ship->x >= Spare->ex || Ship->ex <= Spare->x || Ship->y >= Spare->ey || Ship->ey <= Spare->y))
+            {
+                if (sound)mciSendString(L"play .\\res\\snd\\lifes.wav", NULL, NULL, NULL);
+                if (Ship->lifes < 120)
+                {
+                    Ship->lifes += 30;
+                    if (Ship->lifes > 120)Ship->lifes = 120;
+                }
+                else score += 30;
+                ReleaseCOM(&Spare);
+                Spare = nullptr;
             }
         }
 
@@ -1162,8 +1290,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
         }
 
         if (BadShip && rand() % 200 == 66)
+        {
+            if (sound)mciSendString(L"play .\\res\\snd\\laser.wav", NULL, NULL, NULL);
             vBadLasers.push_back(ProtonFactory(types::bad_laser, BadShip->x, BadShip->y + 25.0f));
-
+        }
 
         // LASERS *****************************
         if (!vBadLasers.empty())
@@ -1200,7 +1330,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                     if (!(Ship->x >= (*las)->ex || Ship->ex <= (*las)->x || Ship->y >= (*las)->ey || Ship->ey <= (*las)->y))
                     {
                         Ship->lifes -= 30;
-                        if (Ship->lifes <= 0)Ship->Transform(types::explosion);
+                        if (Ship->lifes <= 0)
+                        {
+                            if (sound)mciSendString(L"play .\\res\\snd\\explosion.wav", NULL, NULL, NULL);
+                            Ship->Transform(types::explosion);
+                        }
+                        else if (sound)mciSendString(L"play .\\res\\snd\\damage.wav", NULL, NULL, NULL);
                         (*las)->Release();
                         vBadLasers.erase(las);
                         break;
@@ -1220,9 +1355,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                         BadShip->lifes -= 20;
                         if (BadShip->lifes <= 0)
                         {
+                            if (sound)mciSendString(L"play .\\res\\snd\\explosion.wav", NULL, NULL, NULL);
                             score += 50;
                             BadShip->Transform(types::explosion);
                         }
+                        else if (sound)mciSendString(L"play .\\res\\snd\\damage.wav", NULL, NULL, NULL);
+
                         (*las)->Release();
                         vLasers.erase(las);
                         break;
@@ -1246,6 +1384,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                         vLasers.erase(laser);
                         if ((*rock)->GetType() == types::vblock)
                         {
+                            if (sound)mciSendString(L"play .\\res\\snd\\damage.wav", NULL, NULL, NULL);
                             (*rock)->Transform(types::big_block_u);
                             score += 30;
                         }
@@ -1290,7 +1429,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             if (!(Ship->x > Portal->ex - 20.0f || Ship->ex + 20.0f < Portal->x
                 || Ship->y > Portal->ey - 20.0f || Ship->ey + 20.0f < Portal->y))NewLevel();
         }
-
 
         //DRAW THINGS ***********************************************************************
 
@@ -1472,11 +1610,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
         {
             if (BadShip->GetType() == types::explosion)
             {
+                
                 int ex_frame = BadShip->GetFrame();
                 Draw->DrawBitmap(bmpExplosion[ex_frame], D2D1::RectF(BadShip->x, BadShip->y - 100.0f, 
                     BadShip->ex + 50.0f, BadShip->ey));
                 if (ex_frame >= 23)
                 {
+                    if (rand() % 10 == 3 && !Spare)Spare = new BASIC(BadShip->x, BadShip->y, 50.0f, 50.0f);
                     BadShip->Release();
                     BadShip = nullptr;
                 }
@@ -1492,6 +1632,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             for (int i = 0; i < vLasers.size(); ++i)
                 Draw->DrawBitmap(bmpLaser, D2D1::RectF(vLasers[i]->x, vLasers[i]->y,
                     vLasers[i]->ex, vLasers[i]->ey));
+        if (Spare)Draw->DrawBitmap(bmpSpare, D2D1::RectF(Spare->x, Spare->y, Spare->ex, Spare->ey));
         if (Cloud1)
             Draw->DrawBitmap(bmpCloud1, D2D1::RectF(Cloud1->x, Cloud1->y, Cloud1->ex, Cloud1->ey));
         if (Cloud2)
