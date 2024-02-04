@@ -125,6 +125,7 @@ std::vector<prot_ptr>vBadLasers;
 prot_ptr BadShip = nullptr;
 prot_ptr Cloud1 = nullptr;
 prot_ptr Cloud2 = nullptr;
+bas_ptr Portal = nullptr;
 
 ///////////////////////////////////////
 
@@ -302,6 +303,7 @@ void InitGame()
     ReleaseCOM(&BadShip);
     ReleaseCOM(&Cloud1);
     ReleaseCOM(&Cloud2);
+    ReleaseCOM(&Portal);
     vRocks.clear();
     vLasers.clear();
     vBadLasers.clear();
@@ -518,6 +520,108 @@ void InitD2D1()
     }
     Sleep(2500);
 }
+void NewLevel()
+{
+    if (sound)mciSendString(L"play .\\res\\snd\\levelup.wav", NULL, NULL, NULL);
+    wchar_t start_text[19] = L"НИВОТО ПРЕМИНАТО !";
+    wchar_t show_text[19] = L"\0";
+
+    for (int i = 0; i < 19; i++)
+    {
+        mciSendString(L"play .\\res\\snd\\click.wav", NULL, NULL, NULL);
+        show_text[i] = start_text[i];
+        if (Draw && bigTextForm && field_txt_brush)
+        {
+            Draw->BeginDraw();
+            Draw->Clear(D2D1::ColorF(D2D1::ColorF::DarkBlue));
+            Draw->DrawTextW(show_text, i, bigTextForm, D2D1::RectF(300.0f, 300.0f, cl_width, cl_height), field_txt_brush);
+            Draw->EndDraw();
+            Sleep(30);
+        }
+    }
+    Sleep(2500);
+
+
+    int ship_current_lifes = 0;
+    if (Ship)ship_current_lifes = Ship->lifes;
+
+    seconds = 180 + level * 10;
+    level++;
+
+    if (!vRocks.empty())
+    {
+        for (int i = 0; i < vRocks.size(); ++i)ReleaseCOM(&vRocks[i]);
+    }
+
+    if (!vLasers.empty())
+    {
+        for (int i = 0; i < vLasers.size(); ++i)ReleaseCOM(&vLasers[i]);
+    }
+
+    if (!vBadLasers.empty())
+    {
+        for (int i = 0; i < vBadLasers.size(); ++i)ReleaseCOM(&vBadLasers[i]);
+    }
+
+    ReleaseCOM(&Field);
+    ReleaseCOM(&Ship);
+    ReleaseCOM(&BadShip);
+    ReleaseCOM(&Cloud1);
+    ReleaseCOM(&Cloud2);
+    ReleaseCOM(&Portal);
+    vRocks.clear();
+    vLasers.clear();
+    vBadLasers.clear();
+
+    Field = ProtonFactory(types::field, 0, 0);
+    Ship = ProtonFactory(types::ship, 120.0f, cl_height / 2);
+    Ship->lifes = ship_current_lifes; 
+
+    for (int i = 0; i < 8; i++)
+    {
+        types one_type = types::no_type;
+        float start_x = 0;
+        float start_y = 0;
+
+        switch (rand() % 4)
+        {
+        case 0:
+            one_type = types::big_block_u;
+            break;
+
+        case 1:
+            one_type = types::big_block_d;
+            break;
+
+        case 2:
+            one_type = types::small_block;
+            break;
+
+        case 3:
+            one_type = types::vblock;
+            break;
+        }
+
+        if (i == 0)
+        {
+            start_x = cl_width;
+            if (one_type == types::big_block_u)start_y = 51.0f;
+            else if (one_type == types::big_block_d)start_y = 550.0f;
+            else if (one_type == types::small_block)start_y = 51.0f;
+            else if (one_type == types::vblock) start_y = 51.0f + rand() % 200;
+        }
+        else
+        {
+            start_x = vRocks.back()->ex;
+            if (one_type == types::big_block_u)start_y = 51.0f;
+            else if (one_type == types::big_block_d)start_y = 550.0f;
+            else if (one_type == types::small_block)start_y = 51.0f;
+            else if (one_type == types::vblock) start_y = 51.0f + rand() % 200;
+        }
+        vRocks.push_back(ProtonFactory(one_type, start_x, start_y));
+    }
+
+}
 
 INT_PTR CALLBACK bDlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -608,6 +712,12 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
 
     case WM_TIMER:
         if (pause)break;
+        if (seconds <= 0)
+        {
+            if (!Portal)
+                Portal = new BASIC(850.0f, 51.0f + rand() % 550, 100.0f, 100.0f);
+            break;
+        }
         seconds--;
         minutes = seconds / 60;
         break;
@@ -746,6 +856,18 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
                 break;
             }
             InitGame();
+            break;
+
+        case mSpeed:
+            pause = true;
+            if (sound)mciSendString(L"play .\\res\\snd\\select.wav", NULL, NULL, NULL);
+            if (MessageBox(hwnd, L"Ако продължиш ще загубиш бонусите за нивото !\n\nНаистина ли минаваш на следващо ниво ?",
+                L"Ново ниво ?", MB_YESNO | MB_APPLMODAL | MB_ICONQUESTION) == IDNO)
+            {
+                pause = false;
+                break;
+            }
+            NewLevel();
             break;
 
 
@@ -1161,6 +1283,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
         }
 
+        // PORTAL *****************************
+
+        if (Ship && Portal)
+        {
+            if (!(Ship->x > Portal->ex - 20.0f || Ship->ex + 20.0f < Portal->x
+                || Ship->y > Portal->ey - 20.0f || Ship->ey + 20.0f < Portal->y))NewLevel();
+        }
+
 
         //DRAW THINGS ***********************************************************************
 
@@ -1268,7 +1398,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
         /////////////////////////////////////////////////////////////////////////////////////
         
-        
+        if (Portal)
+            Draw->DrawBitmap(bmpPortal, D2D1::RectF(Portal->x, Portal->y, Portal->ex, Portal->ey));
         if (Ship)
         {
             if (Ship->GetType() != types::explosion)
