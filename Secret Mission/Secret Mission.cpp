@@ -393,8 +393,9 @@ void GameOver()
     KillTimer(bHwnd, bTimer);
     PlaySound(NULL, NULL, NULL);
 
-    wchar_t final_text[20] = L"О, О, О ! ЗАГУБИ !";
-    wchar_t show_text[20] = L"\0";
+    wchar_t final_text[50] = L"О, О, О ! ЗАГУБИ !";
+    wchar_t show_text[50] = L"\0";
+    int fin_size = 0;
 
     switch (CheckRecord())
     {
@@ -413,20 +414,25 @@ void GameOver()
         break;
     }
 
-    for (int i = 0; i < 20; i++)
+    for (int i = 0; i < 50; i++)
     {
-        mciSendString(L"play .\\res\\snd\\click.wav", NULL, NULL, NULL);
+        if (final_text[i] != '\0')fin_size++;
+        else break;
+    }
+
+    for (int i = 0; i <= fin_size; i++)
+    {
         show_text[i] = final_text[i];
         if (Draw && bigTextForm && field_txt_brush)
         {
             Draw->BeginDraw();
             Draw->Clear(D2D1::ColorF(D2D1::ColorF::DarkBlue));
-            Draw->DrawTextW(show_text, i, bigTextForm, D2D1::RectF(200.0f, 300.0f, cl_width, cl_height), field_txt_brush);
+            Draw->DrawTextW(show_text, i, bigTextForm, D2D1::RectF(150.0f, 300.0f, cl_width, cl_height), field_txt_brush);
             Draw->EndDraw();
             Sleep(30);
         }
     }
-    Sleep(2500);
+    Sleep(7000);
 
     bMsg.message = WM_QUIT;
     bMsg.wParam = 0;
@@ -596,7 +602,6 @@ void NewLevel()
 
     for (int i = 0; i < 19; i++)
     {
-        mciSendString(L"play .\\res\\snd\\click.wav", NULL, NULL, NULL);
         show_text[i] = start_text[i];
         if (Draw && bigTextForm && field_txt_brush)
         {
@@ -690,6 +695,58 @@ void NewLevel()
         vRocks.push_back(ProtonFactory(one_type, start_x, start_y));
     }
 
+}
+void HallofFame()
+{
+    int result = 0;
+    CheckFile(recordFile, &result);
+
+    if (result == FILE_NOT_EXIST)
+    {
+        if (sound)mciSendString(L"play . \\res\\snd\\negative.wav", NULL, NULL, NULL);
+        MessageBox(bHwnd, L"Все още няма рекорд на играта !\n\nПостарай се повече !",
+            L"Липсва файл!", MB_OK | MB_APPLMODAL | MB_ICONEXCLAMATION);
+        return;
+    }
+
+    wchar_t status_text[60] = L"НАЙ-ДОБЪР ИГРАЧ: ";
+    int st_size = 0;
+
+    wchar_t saved_player[16] = L"\0";
+    wchar_t add[10] = L"\0";
+    int saved_score = 0;
+
+    std::wifstream rec(recordFile);
+    rec >> saved_score;
+    swprintf(add, 6, L"%d", saved_score);
+
+    for (int i = 0; i < 16; i++)
+    {
+        int letter = 0;
+        rec >> letter;
+        saved_player[i] = static_cast<wchar_t>(letter);
+    }
+    rec.close();
+
+    wcscat_s(status_text, saved_player);
+    wcscat_s(status_text, L"\nРЕКОРД: ");
+    wcscat_s(status_text, add);
+
+    for (int i = 0; i < 60; i++)
+    {
+        if (status_text[i] != '\0')st_size++;
+        else break;
+    }
+
+    mciSendString(L"play .\\res\\snd\\tada.wav", NULL, NULL, NULL);
+    if (Draw && bigTextForm && field_txt_brush)
+    {
+        Draw->BeginDraw();
+        Draw->Clear(D2D1::ColorF(D2D1::ColorF::DarkBlue));
+        Draw->DrawTextW(status_text, st_size, bigTextForm, D2D1::RectF(250.0f, 300.0f, cl_width, cl_height), field_txt_brush);
+        Draw->EndDraw();
+        Sleep(3000);
+    }
 }
 
 INT_PTR CALLBACK bDlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
@@ -942,13 +999,16 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
             NewLevel();
             break;
 
-
-
         case mExit:
             SendMessage(hwnd, WM_CLOSE, NULL, NULL);
             break;
 
 
+        case mHoF:
+            pause = true;
+            HallofFame();
+            pause = false;
+            break;
         }
         break;
 
@@ -1153,6 +1213,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                 {
                     if (!(Ship->x > vRocks[i]->ex || Ship->ex < vRocks[i]->x || Ship->y > vRocks[i]->ey || Ship->ey < vRocks[i]->y))
                     {
+                        if (sound)mciSendString(L"play .\\res\\snd\\explosiom.wav", NULL, NULL, NULL);
                         Ship->Transform(types::explosion);
                         break;
                     }
