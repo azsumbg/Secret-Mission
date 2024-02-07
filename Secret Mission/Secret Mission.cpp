@@ -703,7 +703,7 @@ void HallofFame()
 
     if (result == FILE_NOT_EXIST)
     {
-        if (sound)mciSendString(L"play . \\res\\snd\\negative.wav", NULL, NULL, NULL);
+        if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
         MessageBox(bHwnd, L"Все още няма рекорд на играта !\n\nПостарай се повече !",
             L"Липсва файл!", MB_OK | MB_APPLMODAL | MB_ICONEXCLAMATION);
         return;
@@ -738,7 +738,7 @@ void HallofFame()
         else break;
     }
 
-    mciSendString(L"play .\\res\\snd\\tada.wav", NULL, NULL, NULL);
+    if(sound)mciSendString(L"play .\\res\\snd\\tada.wav", NULL, NULL, NULL);
     if (Draw && bigTextForm && field_txt_brush)
     {
         Draw->BeginDraw();
@@ -746,6 +746,260 @@ void HallofFame()
         Draw->DrawTextW(status_text, st_size, bigTextForm, D2D1::RectF(250.0f, 300.0f, cl_width, cl_height), field_txt_brush);
         Draw->EndDraw();
         Sleep(3000);
+    }
+}
+void SaveGame()
+{
+    int result = 0;
+    CheckFile(saveFile, &result);
+    if (result == FILE_EXIST)
+    {
+        if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+        if (MessageBox(bHwnd, L"Има предишна записана игра !\n\nДа я презапиша ли ?",
+            L"Изход ?", MB_YESNO | MB_APPLMODAL | MB_ICONQUESTION) == IDNO) return;
+    }
+
+    std::wofstream save(saveFile);
+    save << score << std::endl;
+    save << level << std::endl;
+    save << seconds << std::endl;
+    save << minutes << std::endl;
+    for (int i = 0; i < 16; i++)save << static_cast<int>(current_player[i]) << std::endl;
+    save << set_name << std::endl;
+    save << vRocks.size() << std::endl;
+    if (!vRocks.empty())
+    {
+        for (int i = 0; i < vRocks.size(); ++i)
+        {
+            save << static_cast<int>(vRocks[i]->GetType()) << std::endl;
+            save << vRocks[i]->x << std::endl;
+            save << vRocks[i]->y << std::endl;
+        }
+
+    }
+    if (!Ship)save << -1 << std::endl;
+    else
+    {
+        save << Ship->x << std::endl;
+        save << Ship->y << std::endl;
+        save << Ship->lifes << std::endl;
+    }
+    if (!BadShip)save << -1 << std::endl;
+    else
+    {
+        save << BadShip->x << std::endl;
+        save << BadShip->y << std::endl;
+        save << BadShip->lifes << std::endl;
+    }
+    if (!Portal)save << -1 << std::endl;
+    else
+    {
+        save << Portal->x << std::endl;
+        save << Portal->y << std::endl;
+    }
+    if (!Spare)save << -1 << std::endl;
+    else
+    {
+        save << Spare->x << std::endl;
+        save << Spare->y << std::endl;
+    }
+    save.close();
+
+    if (sound)mciSendString(L"play .\\res\\snd\\save.wav", NULL, NULL, NULL);
+    MessageBox(bHwnd, L"Играта е запазена !", L"Запис !", MB_OK | MB_APPLMODAL | MB_ICONINFORMATION);
+
+
+}
+void LoadGame()
+{
+    int res = 0;
+    float result = 0;
+
+    CheckFile(saveFile, &res);
+    if (res == FILE_NOT_EXIST)
+    {
+        if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+        MessageBox(bHwnd, L"Все още няма записана играта !\n\nПостарай се повече !",
+            L"Липсва файл!", MB_OK | MB_APPLMODAL | MB_ICONEXCLAMATION);
+        return;
+    }
+    else
+    {
+        if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+        if (MessageBox(bHwnd, L"Настоящата игра ще бъде загубена!\n\nДа я заредя ли записа ?",
+            L"Изход ?", MB_YESNO | MB_APPLMODAL | MB_ICONQUESTION) == IDNO) return;
+    }
+
+    if (!vRocks.empty())
+    {
+        for (int i = 0; i < vRocks.size(); ++i)ReleaseCOM(&vRocks[i]);
+    }
+
+    if (!vLasers.empty())
+    {
+        for (int i = 0; i < vLasers.size(); ++i)ReleaseCOM(&vLasers[i]);
+    }
+
+    if (!vBadLasers.empty())
+    {
+        for (int i = 0; i < vBadLasers.size(); ++i)ReleaseCOM(&vBadLasers[i]);
+    }
+
+    ReleaseCOM(&Field);
+    ReleaseCOM(&Ship);
+    ReleaseCOM(&BadShip);
+    ReleaseCOM(&Cloud1);
+    ReleaseCOM(&Cloud2);
+    ReleaseCOM(&Portal);
+    ReleaseCOM(&Spare);
+    vRocks.clear();
+    vLasers.clear();
+    vBadLasers.clear();
+
+    Field = ProtonFactory(types::field, 0, 0);
+    
+    //********************************************
+    
+    
+    std::wifstream save(saveFile);
+    save >> score;
+    save >> level;
+    save >> seconds;
+    save >> minutes;
+    for (int i = 0; i < 16; i++)
+    {
+        int letter = 0;
+        save >> letter;
+        current_player[i]=static_cast<wchar_t>(letter);
+    }
+    save >> set_name;
+    save >> result;
+    if (result > 0)
+    {
+        for (int i = 0; i < result; ++i)
+        {
+            int atype = -1;
+            float ax = 0; 
+            float ay = 0;
+            
+            save >> atype;
+            save >> ax;
+            save >> ay;
+
+            vRocks.push_back(ProtonFactory(static_cast<types>(atype), ax, ay));
+        }
+
+    }
+    
+    save >> result;
+    if (result != -1)
+    {
+        float ay = 0;
+        int alifes = 0;
+        save >> ay;
+        save >> alifes;
+        Ship = ProtonFactory(types::ship, (float)(result), ay);
+        Ship->lifes = alifes;
+    }
+
+    save >> result;
+    if (result != -1)
+    {
+        float ay = 0;
+        int alifes = 0;
+        save >> ay;
+        save >> alifes;
+        BadShip = ProtonFactory(types::battleship, (float)(result), ay);
+        BadShip->lifes = alifes;
+    }
+    
+    save >> result;
+    if (result != -1)
+    {
+        float ay = 0;
+        save >> ay;
+        Portal = new BASIC((float)(result), ay, 100.0f, 100.0f);
+    }
+
+    save >> result;
+    if (result != -1)
+    {
+        float ay = 0;
+        save >> ay;
+        Spare = new BASIC((float)(result), ay, 50.0f, 50.0f);
+    }
+    
+    save.close();
+
+    if (sound)mciSendString(L"play .\\res\\snd\\save.wav", NULL, NULL, NULL);
+    MessageBox(bHwnd, L"Играта е заредена !", L"Запис !", MB_OK | MB_APPLMODAL | MB_ICONINFORMATION);
+    
+
+}
+void ShowHelp()
+{
+    int result = 0;
+    CheckFile(helpFile, &result);
+    if (result == FILE_NOT_EXIST)
+    {
+        if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+        MessageBox(bHwnd, L"Не е налична помощ за играта !\n\nСвържете се с разработчика !",
+            L"Липсва файл!", MB_OK | MB_APPLMODAL | MB_ICONEXCLAMATION);
+        show_help = false;
+        pause = false;
+        return;
+    }
+
+    wchar_t show_text[1000] = L"\0";
+    
+
+    std::wifstream help(helpFile);
+    help >> result;
+    for (int i = 1; i < result; i++)
+    {
+        int letter = 0;
+        help >> letter;
+        show_text[i] = static_cast<wchar_t>(letter);
+    }
+    help.close();
+
+    if(sound)mciSendString(L"play .\\res\\snd\\tada.wav", NULL, NULL, NULL);
+    if (Draw && nrmTextForm && field_txt_brush)
+    {
+        Draw->BeginDraw();
+        Draw->Clear(D2D1::ColorF(D2D1::ColorF::DarkBlue));
+        if (nrmTextForm && but_bck_brush && but_hglt_brush && but_inact_brush && but_txt_brush)
+        {
+            Draw->FillRectangle(D2D1::RectF(0, 0, scr_width, 50.0f), but_bck_brush);
+            if (set_name)
+                Draw->DrawTextW(L"Име на играч", 13, nrmTextForm, D2D1::RectF(b1Rct.left + 50.0f, 0, b1Rct.right, 50.0f),
+                    but_inact_brush);
+            else
+            {
+                if (b1_hglt)
+                    Draw->DrawTextW(L"Име на играч", 13, nrmTextForm, D2D1::RectF(b1Rct.left + 50.0f, 0, b1Rct.right, 50.0f),
+                        but_hglt_brush);
+                else
+                    Draw->DrawTextW(L"Име на играч", 13, nrmTextForm, D2D1::RectF(b1Rct.left + 50.0f, 0, b1Rct.right, 50.0f),
+                        but_txt_brush);
+            }
+
+            if (b2_hglt)
+                Draw->DrawTextW(L"Звуци ON / OFF", 15, nrmTextForm, D2D1::RectF(b2Rct.left + 50.0f, 0, b2Rct.right, 50.0f),
+                    but_hglt_brush);
+            else
+                Draw->DrawTextW(L"Звуци ON / OFF", 15, nrmTextForm, D2D1::RectF(b2Rct.left + 50.0f, 0, b2Rct.right, 50.0f),
+                    but_txt_brush);
+
+            if (b3_hglt)
+                Draw->DrawTextW(L"Помощ за играта", 16, nrmTextForm, D2D1::RectF(b3Rct.left + 50.0f, 0, b3Rct.right, 50.0f),
+                    but_hglt_brush);
+            else
+                Draw->DrawTextW(L"Помощ за играта", 16, nrmTextForm, D2D1::RectF(b3Rct.left + 50.0f, 0, b3Rct.right, 50.0f),
+                    but_txt_brush);
+        }
+        Draw->DrawTextW(show_text, result, nrmTextForm, D2D1::RectF(150.0f, 60.0f, cl_width, cl_height), field_txt_brush);
+        Draw->EndDraw();
     }
 }
 
@@ -862,7 +1116,7 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
         ScreenToClient(hwnd, &cur_pos);
         if (LOWORD(lParam) == HTCLIENT)
         {
-            if (!in_client)
+            if (!in_client && !show_help)
             {
                 in_client = true;
                 pause = false;
@@ -943,7 +1197,7 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
         }
         else
         {
-            if (in_client)
+            if (in_client && !show_help)
             {
                 in_client = false;
                 pause = true;
@@ -1003,6 +1257,17 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
             SendMessage(hwnd, WM_CLOSE, NULL, NULL);
             break;
 
+        case mSave:
+            pause = true;
+            SaveGame();
+            pause = false;
+            break;
+
+        case mLoad:
+            pause = true;
+            LoadGame();
+            pause = false;
+            break;
 
         case mHoF:
             pause = true;
@@ -1080,9 +1345,23 @@ LRESULT CALLBACK bWinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPa
                 break;
             }
         }
-
-
-
+        if (LOWORD(lParam) >= b3Rct.left && LOWORD(lParam) <= b3Rct.right && HIWORD(lParam) <= 50.0f)
+        {
+            if (sound)mciSendString(L"play .\\res\\snd\\select.wav", NULL, NULL, NULL);
+            if (!show_help)
+            {
+                show_help = true;
+                pause = true;
+                ShowHelp();
+                break;
+            }
+            else
+            {
+                show_help = false;
+                pause = false;
+                break;
+            }
+        }
         break;
 
     default: return DefWindowProc(hwnd, ReceivedMsg, wParam, lParam);
@@ -1131,6 +1410,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     {
         ShowWindow(bHwnd, SW_SHOWDEFAULT);
         InitD2D1();
+        PlaySound(soundFile, NULL, SND_ASYNC | SND_LOOP);
     }
 
     while (bMsg.message != WM_QUIT)
